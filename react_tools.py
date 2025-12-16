@@ -1,5 +1,4 @@
 from dotenv import load_dotenv
-from langchain_community.tools import DuckDuckGoSearchRun
 
 # from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
@@ -160,23 +159,25 @@ def calculate_financial_metrics(csv_file: str) -> dict:
         # Create output DataFrame
         metrics_df = pd.DataFrame(metrics_list)
 
-        # Print formatted table to console
-        print("\n" + "="*100)
-        print("FINANCIAL METRICS SUMMARY")
-        print("="*100)
-        print(metrics_df.to_string(index=False))
-        print("="*100 + "\n")
-
-        # Generate output filename from input filename
+        # Generate output filenames from input filename
         base_name = os.path.splitext(os.path.basename(csv_file))[0]
-        output_file = f"{base_name}_metrics.csv"
+        csv_output = f"{base_name}_metrics.csv"
+        txt_output = f"{base_name}_metrics.txt"
 
         # Save to CSV
-        metrics_df.to_csv(output_file, index=False)
+        metrics_df.to_csv(csv_output, index=False)
+
+        # Save formatted table to TXT file
+        with open(txt_output, 'w') as f:
+            f.write("=" * 100 + "\n")
+            f.write("FINANCIAL METRICS SUMMARY\n")
+            f.write("=" * 100 + "\n")
+            f.write(metrics_df.to_string(index=False) + "\n")
+            f.write("=" * 100 + "\n")
 
         return {
-            "message": f"Calculated metrics saved to {output_file}",
-            "csv_file": output_file
+            "message": f"Calculated metrics saved to {csv_output} and {txt_output}",
+            "csv_file": csv_output
         }
 
     except FileNotFoundError:
@@ -220,10 +221,8 @@ def plot_stock_prices(csv_file: str) -> str:
     return f"Plot saved to {plot_file}"
 
 
-search = DuckDuckGoSearchRun()
-
-tools = [search, get_stock_data, calculate_financial_metrics, plot_stock_prices]
-llm = ChatOpenAI(model="gpt-5-nano", temperature=0.2)  # swap with ChatGoogleGenerativeAI(...) to use Gemini
+tools = [get_stock_data, calculate_financial_metrics, plot_stock_prices]
+llm = ChatOpenAI(model="gpt-5-nano", temperature=0.1)  # swap with ChatGoogleGenerativeAI(...) to use Gemini
 llm_with_tools = llm.bind_tools(tools)
 
 
@@ -307,10 +306,52 @@ if __name__ == "__main__":
         # Invoke the agent
         response = react_graph.invoke({"messages": messages})
 
+        # Get new messages since last turn
+        new_messages = response["messages"][len(messages):]
+
         # Update message history with full conversation
         messages = response["messages"]
 
-        # Print only the last AI message
-        last_message = messages[-1]
-        print(f"\nAssistant: {last_message.content}\n")
-        print("-" * 80 + "\n")
+        # Separate reasoning from final output
+        reasoning_msgs = []
+        final_output = None
+
+        for i, msg in enumerate(new_messages):
+            # If AI message with tool calls, it's reasoning
+            if msg.type == "ai" and hasattr(msg, 'tool_calls') and msg.tool_calls:
+                reasoning_msgs.append(msg)
+            # If tool message, it's part of reasoning
+            elif msg.type == "tool":
+                reasoning_msgs.append(msg)
+            # Last AI message without tool calls is final output
+            elif msg.type == "ai" and i == len(new_messages) - 1:
+                final_output = msg
+            # Other AI messages in the middle might be intermediate thoughts
+            elif msg.type == "ai":
+                reasoning_msgs.append(msg)
+
+        # Display reasoning process
+        if reasoning_msgs:
+            print("\n" + "=" * 80)
+            print("Thinking:")
+            print("=" * 80 + "\n")
+            for msg in reasoning_msgs:
+                if hasattr(msg, 'content') and msg.content:
+                    if msg.type == "ai":
+                        print(f"\n{msg.content}\n")
+                    elif msg.type == "tool":
+                        print(f"OBSERVATION: {msg.content}\n")
+
+                if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                    for tool_call in msg.tool_calls:
+                        print(f"ACTION: {tool_call['name']}({tool_call['args']})\n")
+
+        # Display final output separator
+        if final_output and final_output.content:
+            print("=" * 80)
+            print("FINAL OUTPUT:")
+            print("=" * 80)
+            print(f"\n{final_output.content}\n")
+            print("=" * 80)
+
+        print("\n")
