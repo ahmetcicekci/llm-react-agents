@@ -1,54 +1,65 @@
 # llm-react-agents
 
+A ReAct-style financial analysis chatbot powered by LangChain and OpenAI that fetches stock data, calculates financial metrics, and creates visualizations.
+
 ## How to run
 
 ```bash
 uv run react_tools.py
 ```
 
-## Sample output 
+## Changes from Ahmet Çiçekci's Version
 
-```text
-================================ Human Message =================================
+This version includes significant enhancements made by Necati Sefercioğlu:
 
-Show me google stock prices between 2024 and 2025.
-================================== Ai Message ==================================
+### New Features
 
-Thought: I will fetch the historical daily closing prices for Alphabet (GOOGL) for the years 2024 through 2025, then plot them to visualize the trend.
-Action: call the get_stock_prices tool with ticker "GOOGL", start_year 2024, end_year 2025.
-Tool Calls:
-  get_stock_prices (call_dks1nK9c8mS1DVoiXnsaNzl8)
- Call ID: call_dks1nK9c8mS1DVoiXnsaNzl8
-  Args:
-    ticker: GOOGL
-    start_year: 2024
-    end_year: 2025
-================================= Tool Message =================================
-Name: get_stock_prices
+1. **Enhanced Stock Data Fetching**
+   - Renamed `get_stock_prices` → `get_stock_data`
+   - Now fetches complete OHLCV data (Open, High, Low, Close, Volume) instead of just closing prices
+   - Provides richer dataset for comprehensive financial analysis
 
-{"message": "Saved prices to GOOGL_2024_to_2025.csv", "csv_file": "GOOGL_2024_to_2025.csv"}
-================================== Ai Message ==================================
+2. **Financial Metrics Calculator** (NEW)
+   - Added `calculate_financial_metrics` function that computes:
+     - Basic statistics (First Open, Last Close, High, Low, Average Volume)
+     - Yearly and cumulative returns (%)
+     - Annualized volatility (%)
+     - Sharpe ratio (using 2% risk-free rate)
+     - Maximum drawdown (%)
+   - Outputs both CSV and formatted TXT files for easy reading
 
-Observation: Retrieved CSV file path GOOGL_2024_to_2025.csv containing Google stock prices for 2024-2025.
-Thought: I will plot the stock prices to visualize the data.
-Action: call the plot_stock_prices tool with csv_file set to "GOOGL_2024_to_2025.csv".
-Tool Calls:
-  plot_stock_prices (call_lQtcOAzb6f2ZV1ZubQQjhaP0)
- Call ID: call_lQtcOAzb6f2ZV1ZubQQjhaP0
-  Args:
-    csv_file: GOOGL_2024_to_2025.csv
-================================= Tool Message =================================
-Name: plot_stock_prices
+3. **Interactive Chat Interface**
+   - Converted from single-query execution to continuous conversation loop
+   - Type 'exit' or 'quit' to end the session
+   - Agent introduces itself and explains capabilities at startup
+   - Maintains conversation context across multiple queries
 
-Plot saved to GOOGL_2024_to_2025_plot.png
-================================== Ai Message ==================================
+4. **Improved Output Formatting**
+   - Separates reasoning process from final output
+   - Shows "Thinking" section with THOUGHT/ACTION/OBSERVATION/DECISION flow
+   - Displays clean "FINAL OUTPUT" section with results
+   - Better visualization of the agent's decision-making process
 
-Here are the Google (GOOGL) stock prices for 2024 and 2025:
+5. **Enhanced System Prompt**
+   - Clearer ReAct reasoning structure with uppercase keywords
+   - Explicit workflow guidance (must fetch data first)
+   - Smart ticker symbol inference (e.g., "Apple" → "AAPL")
+   - Domain-specific focus on financial analysis only
 
-- Data range: 2024-01-01 to 2025-12-31
-- Data source: Historical daily closing prices
-- File with data: GOOGL_2024_to_2025.csv
-- Plot image: GOOGL_2024_to_2025_plot.png
+### Removed Features
 
-Would you like me to summarize the data (e.g., annual returns, average price, volatility) or export the data to another format (CSV, Excel)?
-```
+- Removed DuckDuckGo search tool (simplified to focus on financial tools)
+- Cleaned up sample output files from repository
+
+### Technical Improvements
+
+- Added `numpy` dependency for financial calculations
+- Improved data handling with forward fill for missing values
+- Better error handling and validation
+- Backward compatibility maintained for plotting function
+
+## Available Tools
+
+1. **get_stock_data** - Fetches historical OHLCV data for any stock ticker
+2. **calculate_financial_metrics** - Computes comprehensive financial metrics
+3. **plot_stock_prices** - Creates time-series visualizations
