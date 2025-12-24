@@ -1,0 +1,26 @@
+================================================================================
+Financial Analysis Chatbot
+================================================================================
+Type 'exit' or 'quit' to end the conversation.
+
+Assistant: Hello — I'm a financial analysis assistant for stock market data and investment metrics (I only handle requests in this domain).
+I can fetch historical OHLCV data, compute returns, volatility, Sharpe ratio, max drawdown, create price visualizations, decompose time series, predict prices, and forecast volatility.
+To begin, provide a ticker or company name and optional year range (default 2022–2025) and I’ll fetch the data and run the analysis.
+
+--------------------------------------------------------------------------------
+
+You: Lets plot prices between 2020 and 2021
+FINAL OUTPUT:
+================================================================================ 
+
+
+Please provide the stock ticker or company name (e.g., Apple → AAPL) so I can fetch daily OHLCV data for 2020–2021 and create the price plot.  
+Do you want Close or Adjusted Close prices (Adjusted Close recommended)?
+
+================================================================================ 
+
+
+
+You: quit
+
+Goodbye!

@@ -1,0 +1,28 @@
+================================================================================
+Financial Analysis Chatbot
+================================================================================
+Type 'exit' or 'quit' to end the conversation.
+
+Assistant: Hi — I’m a financial analysis assistant. I can fetch historical stock data, calculate returns/volatility/Sharpe/max drawdown, create price visualizations, decompose time series, predict future prices, and forecast volatility.  
+Tell me a ticker or company name (I’ll infer the ticker) and an optional date range — default is 2022–2025 — or upload a CSV to start.  
+How would you like to proceed?
+
+--------------------------------------------------------------------------------
+
+You: How is the weather
+FINAL OUTPUT:
+================================================================================ 
+
+
+Sorry—I can’t help with weather forecasts.  
+I only handle stock market data and investment analysis.  
+If you’d like, provide a ticker/company name (or upload a CSV) and an optional date range (default 2022–2025).  
+I’ll fetch the data and run returns/volatility/visualizations or forecasts next.
+
+================================================================================ 
+
+
+
+You: quit
+
+Goodbye!
