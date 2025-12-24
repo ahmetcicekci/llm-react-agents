@@ -1,0 +1,154 @@
+================================================================================
+Financial Analysis Chatbot
+================================================================================
+Type 'exit' or 'quit' to end the conversation.
+
+Assistant: Hello — I'm a financial analysis assistant (I only handle stock market data, financial metrics, and investment analysis).  
+I can fetch historical OHLCV data, calculate returns/volatility/Sharpe/max drawdown, create price charts, decompose time series, predict future prices, and forecast volatility.  
+If you give a company name I'll infer the ticker (e.g., Apple → AAPL) and fetch data (default years 2022–2025); what ticker or CSV would you like analyzed?
+
+--------------------------------------------------------------------------------
+
+You: Lets plot tesla between 2020 and 2024
+
+================================================================================
+Agent Reasoning:
+================================================================================
+
+THOUGHT: I need to fetch Tesla (TSLA) historical OHLCV data from 2020 through 2024 to begin the analysis and plotting.
+ACTION: Call get_stock_data for ticker "TSLA" from 2020 to 2024.
+
+ACTION: get_stock_data({'ticker': 'TSLA', 'start_year': 2020, 'end_year': 2024})
+
+OBSERVATION: {"message": "Saved stock data to TSLA_2020_to_2024.csv", "csv_file": "TSLA_2020_to_2024.csv"}
+
+ACTION: plot_stock_prices({'csv_file': 'TSLA_2020_to_2024.csv'})
+
+OBSERVATION: Plot saved to TSLA_2020_to_2024_plot.png
+
+FINAL OUTPUT:
+================================================================================ 
+
+
+I fetched Tesla (TSLA) data for 2020–2024 and generated the historical price plot.  
+I can next compute returns, volatility, Sharpe ratio and max drawdown; decompose trend/seasonality; or produce price and volatility forecasts.  
+Which of these would you like me to run?
+
+================================================================================ 
+
+
+
+You: Lets compute metrics
+
+================================================================================
+Agent Reasoning:
+================================================================================
+
+THOUGHT: Calculate comprehensive financial metrics from the fetched TSLA OHLCV CSV for 2020–2024.
+ACTION: Call calculate_financial_metrics with the CSV file.
+
+
+ACTION: calculate_financial_metrics({'csv_file': 'TSLA_2020_to_2024.csv'})
+
+OBSERVATION: {"message": "Calculated metrics saved to TSLA_2020_to_2024_metrics.csv and TSLA_2020_to_2024_metrics.txt", "csv_file": "TSLA_2020_to_2024_metrics.csv"}
+
+ACTION: display_financial_metrics({'csv_file': 'TSLA_2020_to_2024_metrics.csv'})
+
+FINAL OUTPUT:
+
+====================================================================================================
+FINANCIAL METRICS SUMMARY
+====================================================================================================
+    Period  First_Open  Last_Close   High    Low   Avg_Volume  Yearly_Return_%  Annualized_Volatility_%  Sharpe_Ratio  Max_Drawdown_%
+      2020       28.30      235.22 239.57  23.37 225923862.45           731.18                    89.46         8.151          -60.63
+      2021      239.82      352.26 414.50 179.83  82174886.90            46.89                    54.77         0.819          -36.25
+      2022      382.58      123.18 402.67 108.24  86936333.07           -67.80                    65.33        -1.068          -71.53
+      2023      118.47      248.48 299.29 101.81 137351640.00           109.74                    52.65         2.046          -32.72
+Cumulative       28.30      248.48 414.50  23.37 133226380.02           778.02                    68.10        11.395          -73.63
+====================================================================================================
+
+================================================================================ 
+
+
+Done — I calculated comprehensive metrics (yearly & cumulative returns, annualized volatility, Sharpe ratios, max drawdowns) for TSLA (2020–2024) and saved the results to TSLA_2020_to_2024_metrics.csv.  
+Next steps: I can plot drawdowns/rolling volatility, decompose trend/seasonality, or produce price and volatility forecasts — which would you like?
+
+================================================================================ 
+
+
+
+You: Can you forecast prices
+
+================================================================================
+Agent Reasoning:
+================================================================================
+
+THOUGHT: Create a short-term price forecast for TSLA using the existing TSLA_2020_to_2024.csv — default to a 7-day ahead prediction.
+ACTION: Call predict_future_prices with csv_file "TSLA_2020_to_2024.csv" and days_ahead 7.
+
+ACTION: predict_future_prices({'csv_file': 'TSLA_2020_to_2024.csv', 'days_ahead': 7})
+
+OBSERVATION: {"message": "Price predictions saved to TSLA_2020_to_2024_price_predictions.csv and plot saved to TSLA_2020_to_2024_price_predictions_plot.png", "csv_file": "TSLA_2020_to_2024_price_predictions.csv", "plot_file": "TSLA_2020_to_2024_price_predictions_plot.png"}
+
+FINAL OUTPUT:
+================================================================================ 
+
+
+I generated a 7-day price forecast for TSLA using a Random Forest model and saved the predictions to TSLA_2020_to_2024_price_predictions.csv (plot: TSLA_2020_to_2024_price_predictions_plot.png).  
+Would you like a longer forecast horizon (e.g., 30/90 days), an ensemble model comparison, or an explanation of the model and its accuracy metrics?
+
+================================================================================ 
+
+
+
+You: Make time series decomposition 
+
+================================================================================
+Agent Reasoning:
+================================================================================
+
+THOUGHT: Perform time series decomposition on the TSLA OHLCV CSV (use default period 30) to extract trend, seasonal, and residual components and save visualization.  
+ACTION: Call decompose_time_series with csv_file "TSLA_2020_to_2024.csv".
+
+ACTION: decompose_time_series({'csv_file': 'TSLA_2020_to_2024.csv', 'period': 30})
+
+OBSERVATION: Time series decomposition plot saved to TSLA_2020_to_2024_decomposition.png
+
+FINAL OUTPUT:
+================================================================================ 
+
+
+I decomposed TSLA's price series into trend, seasonal, and residual components (period=30) and saved the plot to TSLA_2020_to_2024_decomposition.png.  
+Would you like the decomposition CSV, a different seasonal period, or further analysis (e.g., filtering noise or testing stationarity)?
+
+================================================================================ 
+
+
+
+You: Lets forecast volatility           
+
+================================================================================
+Agent Reasoning:
+================================================================================
+
+THOUGHT: I will compute and forecast TSLA volatility using the existing OHLCV CSV, producing 7-day and 30-day rolling volatility predictions and plots.  
+ACTION: Call predict_volatility with csv_file "TSLA_2020_to_2024.csv".
+
+ACTION: predict_volatility({'csv_file': 'TSLA_2020_to_2024.csv'})
+
+OBSERVATION: {"message": "Volatility analysis saved to TSLA_2020_to_2024_volatility_summary.csv and plot saved to TSLA_2020_to_2024_volatility_plot.png", "csv_file": "TSLA_2020_to_2024_volatility_summary.csv", "plot_file": "TSLA_2020_to_2024_volatility_plot.png"}
+
+FINAL OUTPUT:
+================================================================================ 
+
+
+I ran a volatility forecast for TSLA, producing 7-day and 30-day rolling volatility predictions; results saved to TSLA_2020_to_2024_volatility_summary.csv and plot saved to TSLA_2020_to_2024_volatility_plot.png.  
+Would you like me to compare predicted volatility to realized returns, or export the summary to Excel?
+
+================================================================================ 
+
+
+
+You: quit 
+
+Goodbye!
