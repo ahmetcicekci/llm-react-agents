@@ -1,0 +1,160 @@
+================================================================================
+Financial Analysis Chatbot
+================================================================================
+Type 'exit' or 'quit' to end the conversation.
+
+Assistant: Hello — I’m a financial analysis assistant. I can fetch historical stock data (I’ll infer tickers from company names), calculate returns, volatility, Sharpe ratio, max drawdown, and other metrics; create price visualizations; decompose time series; predict future prices; and forecast volatility. Provide a ticker or company name and an optional date range (default 2022–2025) or upload a CSV and I’ll fetch the data to get started.
+
+--------------------------------------------------------------------------------
+
+You: Lets plot prices of Google between 2015 and 2023
+
+================================================================================
+Agent Reasoning:
+================================================================================
+
+THOUGHT: I need to fetch historical daily OHLCV data for Google (Alphabet) and then create a price plot for 2015–2023.
+ACTION: Calling get_stock_data for ticker GOOGL from 2015 to 2023.
+
+ACTION: get_stock_data({'ticker': 'GOOGL', 'start_year': 2015, 'end_year': 2023})
+
+OBSERVATION: {"message": "Saved stock data to GOOGL_2015_to_2023.csv", "csv_file": "GOOGL_2015_to_2023.csv"}
+
+THOUGHT: I have the CSV saved. Next I should plot the Close price series from the CSV.
+ACTION: Calling plot_stock_prices with the saved CSV file.
+
+ACTION: plot_stock_prices({'csv_file': 'GOOGL_2015_to_2023.csv'})
+
+OBSERVATION: Plot saved to GOOGL_2015_to_2023_plot.png
+
+FINAL OUTPUT:
+================================================================================ 
+
+
+I fetched Google's daily price data for 2015–2023 and created a historical close-price plot.  
+Next steps: I can compute returns, volatility, Sharpe ratio, max drawdown, perform time-series decomposition, or generate short-term price/volatility forecasts — which would you like?
+
+================================================================================ 
+
+
+
+You: Lets decompose       
+
+================================================================================
+Agent Reasoning:
+================================================================================
+
+THOUGHT: I will run a time-series decomposition on the existing Google CSV (GOOGL_2015_to_2023.csv) using the default seasonal period.  
+ACTION: Calling decompose_time_series with the CSV file.
+
+ACTION: decompose_time_series({'csv_file': 'GOOGL_2015_to_2023.csv'})
+
+OBSERVATION: Time series decomposition plot saved to GOOGL_2015_to_2023_decomposition.png
+
+FINAL OUTPUT:
+================================================================================ 
+
+
+I decomposed Google's 2015–2023 close-price series into trend, seasonal, and residual components and saved the decomposition plot.  
+Next steps: I can summarize the components' statistics, run a seasonal-adjusted forecast, or compute volatility on the residuals — which do you prefer?
+
+================================================================================ 
+
+
+
+You: Can you forecast prices
+
+================================================================================
+Agent Reasoning:
+================================================================================
+
+THOUGHT: Use the existing GOOGL_2015_to_2023.csv to predict future closing prices (default 7 days) with the Random Forest model.  
+ACTION: Calling predict_future_prices with the CSV file and default horizon.
+
+ACTION: predict_future_prices({'csv_file': 'GOOGL_2015_to_2023.csv'})
+
+OBSERVATION: {"message": "Price predictions saved to GOOGL_2015_to_2023_price_predictions.csv and plot saved to GOOGL_2015_to_2023_price_predictions_plot.png", "csv_file": "GOOGL_2015_to_2023_price_predictions.csv", "plot_file": "GOOGL_2015_to_2023_price_predictions_plot.png"}
+
+FINAL OUTPUT:
+================================================================================ 
+
+
+I generated a 7-day Random Forest forecast for Google's closing prices and saved both the predictions CSV and a forecast plot.  
+Next steps: I can increase the forecast horizon, run an ensemble of models (ARIMA + Random Forest), or compute prediction intervals — which would you like?
+
+================================================================================ 
+
+
+
+You: Run volatility forecast  
+
+================================================================================
+Agent Reasoning:
+================================================================================
+
+THOUGHT: I'll run the volatility forecasting routine on the existing GOOGL_2015_to_2023.csv to compute 7‑day and 30‑day rolling volatilities and predict next-day volatility.  
+ACTION: Calling predict_volatility with the CSV file.
+
+ACTION: predict_volatility({'csv_file': 'GOOGL_2015_to_2023.csv'})
+
+OBSERVATION: {"message": "Volatility analysis saved to GOOGL_2015_to_2023_volatility_summary.csv and plot saved to GOOGL_2015_to_2023_volatility_plot.png", "csv_file": "GOOGL_2015_to_2023_volatility_summary.csv", "plot_file": "GOOGL_2015_to_2023_volatility_plot.png"}
+
+FINAL OUTPUT:
+================================================================================ 
+
+
+I computed rolling 7- and 30-day volatilities for Google and produced a next-day volatility prediction; results and a plot were saved.  
+Next steps: I can export the volatility summary, compare realized vs. predicted volatility numerically, or simulate portfolio VaR using the forecast — which option do you want?
+
+================================================================================ 
+
+
+
+You: give me the financial metrics
+
+================================================================================
+Agent Reasoning:
+================================================================================
+
+THOUGHT: Calculate comprehensive financial metrics from the existing GOOGL_2015_to_2023.csv.  
+ACTION: Calling calculate_financial_metrics with the CSV file.
+
+ACTION: calculate_financial_metrics({'csv_file': 'GOOGL_2015_to_2023.csv'})
+
+OBSERVATION: {"message": "Calculated metrics saved to GOOGL_2015_to_2023_metrics.csv and GOOGL_2015_to_2023_metrics.txt", "csv_file": "GOOGL_2015_to_2023_metrics.csv"}
+
+THOUGHT: Load and format the saved metrics for display.
+ACTION: Calling display_financial_metrics to get a formatted table string.
+
+ACTION: display_financial_metrics({'csv_file': 'GOOGL_2015_to_2023_metrics.csv'})
+
+FINAL OUTPUT:
+
+====================================================================================================
+FINANCIAL METRICS SUMMARY
+====================================================================================================
+    Period  First_Open  Last_Close   High   Low  Avg_Volume  Yearly_Return_%  Annualized_Volatility_%  Sharpe_Ratio  Max_Drawdown_%
+      2015       26.43       38.61  39.64 24.36 43396365.08            46.08                    28.91         1.525          -12.46
+      2016       37.82       39.33  41.64 33.38 39381277.78             3.97                    20.02         0.098          -13.53
+      2017       39.73       52.28  53.92 39.55 32342717.13            31.57                    15.20         1.945           -8.45
+      2018       52.26       51.86  64.09 48.52 40919314.74            -0.77                    28.19        -0.098          -23.40
+      2019       50.97       66.47  67.84 50.74 30260753.97            30.39                    23.73         1.196          -19.86
+      2020       66.91       86.97  91.50 50.07 39953114.62            29.98                    38.48         0.727          -30.87
+      2021       87.34      143.77 149.83 84.17 30513936.51            64.60                    24.31         2.576           -8.05
+      2022      143.97       87.57 150.41 82.72 34767530.28           -39.17                    38.73        -1.063          -43.63
+Cumulative       26.43       87.57 150.41 24.36 36444263.21           231.32                    28.29         8.107          -44.32
+====================================================================================================
+
+================================================================================ 
+
+
+I computed comprehensive financial metrics (yearly and cumulative returns, annualized volatility, Sharpe ratio, and max drawdown) for GOOGL (2015–2023) and saved the full metrics table.  
+Next steps: I can export the metrics CSV, plot rolling metrics, run scenario/VaR analysis, or generate forecasts with prediction intervals — which would you like?
+ 
+================================================================================ 
+
+
+
+You: quit 
+
+Goodbye!
