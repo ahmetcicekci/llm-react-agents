@@ -14,6 +14,9 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from statsmodels.tsa.seasonal import seasonal_decompose
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
 import os
 
 load_dotenv()
@@ -186,6 +189,25 @@ def calculate_financial_metrics(csv_file: str) -> dict:
         return {"message": f"Error calculating metrics: {str(e)}", "csv_file": None}
 
 
+def display_financial_metrics(csv_file: str) -> str:
+    """
+    Reads a metrics CSV file and RETURNS it as a formatted table string.
+    No printing, no side effects.
+    """
+    df = pd.read_csv(csv_file)
+
+    if df.empty:
+        return "Metrics file is empty."
+
+    output = "\n" + "=" * 100 + "\n"
+    output += "FINANCIAL METRICS SUMMARY\n"
+    output += "=" * 100 + "\n"
+    output += df.to_string(index=False)
+    output += "\n" + "=" * 100 + "\n"
+
+    return output
+
+
 def plot_stock_prices(csv_file: str) -> str:
     """
     Plots the time-series contained in a CSV file.
@@ -221,8 +243,352 @@ def plot_stock_prices(csv_file: str) -> str:
     return f"Plot saved to {plot_file}"
 
 
-tools = [get_stock_data, calculate_financial_metrics, plot_stock_prices]
-llm = ChatOpenAI(model="gpt-5-nano", temperature=0.1)  # swap with ChatGoogleGenerativeAI(...) to use Gemini
+def decompose_time_series(csv_file: str, period: int = None) -> str:
+    """
+    Performs time series decomposition on stock price data and creates a visualization.
+
+    Decomposes the time series into:
+    - Trend component (long-term progression)
+    - Seasonal component (repeating patterns)
+    - Residual component (irregular fluctuations)
+
+    Args:
+        csv_file (str): Path to CSV file with OHLCV data (output from get_stock_data)
+        period (int): Seasonal period for decomposition. If None, defaults to 30 (monthly pattern)
+
+    Returns:
+        str: Status message with path to saved decomposition plot
+    """
+    df = pd.read_csv(csv_file, parse_dates=["Date"])
+
+    # Determine which column to decompose
+    if "Close" in df.columns:
+        y_col = "Close"
+    else:
+        # Fallback for old format - use first numeric column
+        y_col = df.columns[1]
+
+    # Set index to Date for decomposition
+    df = df.set_index("Date")
+
+    # Default period to 30 days (approximately monthly seasonality) if not specified
+    if period is None:
+        period = 30
+
+    # Ensure we have enough data points for decomposition
+    if len(df) < 2 * period:
+        return f"Error: Not enough data points for decomposition. Need at least {2 * period} data points, but only have {len(df)}."
+
+    # Perform seasonal decomposition
+    decomposition = seasonal_decompose(df[y_col], model='additive', period=period)
+
+    # Derive plot filename from csv filename
+    base_name = os.path.splitext(os.path.basename(csv_file))[0]
+    plot_file = f"{base_name}_decomposition.png"
+
+    # Create decomposition plot
+    fig, axes = plt.subplots(4, 1, figsize=(12, 10))
+
+    # Original
+    decomposition.observed.plot(ax=axes[0])
+    axes[0].set_ylabel('Observed')
+    axes[0].set_title(f'Time Series Decomposition - {base_name}')
+    axes[0].grid(True)
+
+    # Trend
+    decomposition.trend.plot(ax=axes[1])
+    axes[1].set_ylabel('Trend')
+    axes[1].grid(True)
+
+    # Seasonal
+    decomposition.seasonal.plot(ax=axes[2])
+    axes[2].set_ylabel('Seasonal')
+    axes[2].grid(True)
+
+    # Residual
+    decomposition.resid.plot(ax=axes[3])
+    axes[3].set_ylabel('Residual')
+    axes[3].set_xlabel('Date')
+    axes[3].grid(True)
+
+    plt.tight_layout()
+    plt.savefig(plot_file)
+    plt.close()
+
+    return f"Time series decomposition plot saved to {plot_file}"
+
+
+def predict_future_prices(csv_file: str, days_ahead: int = 7) -> dict:
+    """
+    Predicts future stock closing prices using a Random Forest model.
+    Creates lagged features from the last 3 days and iteratively predicts future prices.
+    Saves predictions to CSV and creates a visualization plot.
+
+    Args:
+        csv_file (str): Path to CSV file with OHLCV data (output from get_stock_data)
+        days_ahead (int): Number of days to predict into the future (default: 7)
+
+    Returns:
+        dict: Status message, prediction CSV file path, and plot file path
+    """
+    try:
+        # Load data
+        df = pd.read_csv(csv_file, parse_dates=["Date"])
+
+        if "Close" not in df.columns:
+            return {
+                "message": "Error: CSV does not contain Close column",
+                "csv_file": None,
+                "plot_file": None
+            }
+
+        # Sort by date to ensure chronological order
+        df = df.sort_values("Date")
+
+        # Create lagged features (use past 3 days to predict current day)
+        df["Close_lag1"] = df["Close"].shift(1)
+        df["Close_lag2"] = df["Close"].shift(2)
+        df["Close_lag3"] = df["Close"].shift(3)
+        df = df.dropna()
+
+        if len(df) < 10:
+            return {
+                "message": "Error: Not enough data points to train prediction model (need at least 10)",
+                "csv_file": None,
+                "plot_file": None
+            }
+
+        # Prepare features and target
+        X = df[["Close_lag1", "Close_lag2", "Close_lag3"]]
+        y = df["Close"]
+
+        # Train Random Forest model
+        model = RandomForestRegressor(n_estimators=200, random_state=42)
+        model.fit(X, y)
+
+        # Get last 3 closing prices for prediction
+        last_row = df.tail(1)
+        close_l1 = last_row["Close_lag1"].values[0]
+        close_l2 = last_row["Close_lag2"].values[0]
+        close_l3 = last_row["Close_lag3"].values[0]
+
+        # Iteratively predict future prices
+        predictions = []
+        for _ in range(days_ahead):
+            # Create DataFrame with proper column names to avoid sklearn warning
+            X_pred = pd.DataFrame([[close_l1, close_l2, close_l3]],
+                                   columns=["Close_lag1", "Close_lag2", "Close_lag3"])
+            pred = float(model.predict(X_pred)[0])
+            predictions.append(pred)
+
+            # Shift the window forward
+            close_l3 = close_l2
+            close_l2 = close_l1
+            close_l1 = pred
+
+        # Save predictions to CSV
+        base_name = os.path.splitext(os.path.basename(csv_file))[0]
+        pred_file = f"{base_name}_price_predictions.csv"
+
+        pred_df = pd.DataFrame({
+            "Day": list(range(1, days_ahead + 1)),
+            "Predicted_Close": predictions
+        })
+        pred_df.to_csv(pred_file, index=False)
+
+        # Create visualization
+        plot_file = f"{base_name}_price_predictions_plot.png"
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+        # Plot historical prices (last 30 days)
+        historical = df.tail(30)
+        ax.plot(historical["Date"], historical["Close"],
+                label="Historical Prices", color="blue", linewidth=2)
+
+        # Plot predictions
+        last_date = df["Date"].iloc[-1]
+        future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1),
+                                      periods=days_ahead, freq='D')
+        ax.plot(future_dates, predictions,
+                label="Predicted Prices", color="red", linewidth=2, linestyle="--", marker='o')
+
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Close Price")
+        ax.set_title(f"Price Prediction - {base_name}")
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+
+        plt.savefig(plot_file)
+        plt.close()
+
+        return {
+            "message": f"Price predictions saved to {pred_file} and plot saved to {plot_file}",
+            "csv_file": pred_file,
+            "plot_file": plot_file
+        }
+
+    except Exception as e:
+        return {
+            "message": f"Error in price prediction: {str(e)}",
+            "csv_file": None,
+            "plot_file": None
+        }
+
+
+def predict_volatility(csv_file: str) -> dict:
+    """
+    Predicts future volatility using rolling volatility windows and Linear Regression.
+    Computes last 7-day volatility and predicts next-day volatility.
+    Creates plots showing actual vs predicted volatility for both 7-day and 30-day windows.
+    Saves summary to CSV and creates a visualization plot.
+
+    Args:
+        csv_file (str): Path to CSV file with OHLCV data (output from get_stock_data)
+
+    Returns:
+        dict: Status message, volatility CSV file path, and plot file path
+    """
+    try:
+        # Load data
+        df = pd.read_csv(csv_file, parse_dates=["Date"])
+
+        if "Close" not in df.columns:
+            return {
+                "message": "Error: CSV missing Close column",
+                "csv_file": None,
+                "plot_file": None
+            }
+
+        # Sort by date
+        df = df.sort_values("Date")
+
+        # Calculate daily returns
+        df["Return"] = df["Close"].pct_change()
+
+        # Calculate rolling volatilities
+        df["Volatility_7d"] = df["Return"].rolling(7).std()
+        df["Volatility_30d"] = df["Return"].rolling(30).std()
+
+        # Get last 7-day volatility
+        last_7d_vol = df["Volatility_7d"].iloc[-1]
+        last_7d_vol = float(last_7d_vol) if not np.isnan(last_7d_vol) else None
+
+        # Prepare data for prediction model
+        df_clean = df.dropna()
+
+        if len(df_clean) < 40:
+            return {
+                "message": "Error: Not enough data to train volatility model (need at least 40 days)",
+                "csv_file": None,
+                "plot_file": None
+            }
+
+        # Split data: use 80% for training, 20% for testing
+        split_idx = int(len(df_clean) * 0.8)
+        df_train = df_clean.iloc[:split_idx].copy()
+        df_test = df_clean.iloc[split_idx:].copy()
+
+        # Create features and targets for 7-day volatility prediction
+        X_train_7d = df_train[["Volatility_7d", "Volatility_30d"]]
+        y_train_7d = df_train["Volatility_7d"].shift(-1).dropna()
+        X_train_7d = X_train_7d.iloc[:-1]
+
+        # Create features and targets for 30-day volatility prediction
+        X_train_30d = df_train[["Volatility_7d", "Volatility_30d"]]
+        y_train_30d = df_train["Volatility_30d"].shift(-1).dropna()
+        X_train_30d = X_train_30d.iloc[:-1]
+
+        # Train models
+        model_7d = LinearRegression()
+        model_7d.fit(X_train_7d, y_train_7d)
+
+        model_30d = LinearRegression()
+        model_30d.fit(X_train_30d, y_train_30d)
+
+        # Make predictions on test set
+        X_test = df_test[["Volatility_7d", "Volatility_30d"]]
+
+        # Use DataFrame with column names to avoid sklearn warning
+        pred_7d = model_7d.predict(X_test)
+        pred_30d = model_30d.predict(X_test)
+
+        # Add predictions to test dataframe
+        df_test["Predicted_7d"] = pred_7d
+        df_test["Predicted_30d"] = pred_30d
+
+        # Predict next day's volatility using full dataset
+        X_last = df_clean[["Volatility_7d", "Volatility_30d"]].iloc[[-1]]
+        next_vol_7d = float(model_7d.predict(X_last)[0])
+        next_vol_30d = float(model_30d.predict(X_last)[0])
+
+        # Save volatility summary to CSV
+        base_name = os.path.splitext(os.path.basename(csv_file))[0]
+        vol_file = f"{base_name}_volatility_summary.csv"
+
+        vol_df = pd.DataFrame({
+            "Last_7d_Volatility": [last_7d_vol],
+            "Predicted_Next_7d_Volatility": [next_vol_7d],
+            "Predicted_Next_30d_Volatility": [next_vol_30d]
+        })
+        vol_df.to_csv(vol_file, index=False)
+
+        # Create visualization
+        plot_file = f"{base_name}_volatility_plot.png"
+
+        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 10))
+
+        # Plot 1: Actual vs Predicted 7-Day Volatility
+        ax1.plot(df_test["Date"], df_test["Volatility_7d"],
+                 label="Actual 7-Day Volatility", color="blue", linewidth=2)
+        ax1.plot(df_test["Date"], df_test["Predicted_7d"],
+                 label="Predicted 7-Day Volatility", color="red", linewidth=2, linestyle="--", alpha=0.7)
+        ax1.set_xlabel("Date")
+        ax1.set_ylabel("Volatility")
+        ax1.set_title(f"7-Day Volatility: Actual vs Predicted - {base_name}")
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+
+        # Plot 2: Actual vs Predicted 30-Day Volatility
+        ax2.plot(df_test["Date"], df_test["Volatility_30d"],
+                 label="Actual 30-Day Volatility", color="orange", linewidth=2)
+        ax2.plot(df_test["Date"], df_test["Predicted_30d"],
+                 label="Predicted 30-Day Volatility", color="purple", linewidth=2, linestyle="--", alpha=0.7)
+        ax2.set_xlabel("Date")
+        ax2.set_ylabel("Volatility")
+        ax2.set_title(f"30-Day Volatility: Actual vs Predicted - {base_name}")
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+
+        # Plot 3: Close prices for context
+        ax3.plot(df["Date"], df["Close"], color="green", linewidth=1.5)
+        ax3.set_xlabel("Date")
+        ax3.set_ylabel("Close Price")
+        ax3.set_title(f"Close Prices - {base_name}")
+        ax3.grid(True, alpha=0.3)
+
+        plt.tight_layout()
+        plt.savefig(plot_file)
+        plt.close()
+
+        return {
+            "message": f"Volatility analysis saved to {vol_file} and plot saved to {plot_file}",
+            "csv_file": vol_file,
+            "plot_file": plot_file
+        }
+
+    except Exception as e:
+        return {
+            "message": f"Error in volatility prediction: {str(e)}",
+            "csv_file": None,
+            "plot_file": None
+        }
+
+
+tools = [get_stock_data, calculate_financial_metrics, display_financial_metrics, plot_stock_prices, decompose_time_series, predict_future_prices, predict_volatility]
+llm = ChatOpenAI(model="gpt-5-mini", temperature=0.0)  # swap with ChatGoogleGenerativeAI(...) to use Gemini
 llm_with_tools = llm.bind_tools(tools)
 
 
@@ -235,17 +601,24 @@ def reasoner(state: MessagesState):
 
             "When first greeted or at the start of a conversation, introduce yourself and briefly describe "
             "your capabilities: you can fetch historical stock data, calculate financial metrics "
-            "(returns, volatility, Sharpe ratio, maximum drawdown), and create price visualizations.\n\n"
+            "(returns, volatility, Sharpe ratio, maximum drawdown), create price visualizations, "
+            "perform time series decomposition to identify trends and patterns, predict future prices, "
+            "and forecast volatility.\n\n"
 
             "MANDATORY WORKFLOW:\n"
-            "For new stock analysis requests, the first step must be calling get_stock_data to fetch stock data. "
+            "For new stock analysis requests, the first step must be fetching stock data. "
             "If the user mentions a company name (e.g., 'Apple', 'Google'), infer the ticker symbol (e.g., 'AAPL', 'GOOGL'). "
-            "If no year range is specified, the tool will use its default values (2022-2025).\n\n"
+            "If no year range is specified, use default values (2022-2025).\n\n"
 
             "Exception: If the user references an existing CSV file by name, you may work directly with that file.\n\n"
 
-            "After fetching stock data, you have access to tools for calculating financial metrics and "
-            "creating visualizations. Decide which tools to use based on the user's specific request.\n\n"
+            "After fetching stock data, you can:\n"
+            "- Calculate comprehensive financial metrics (returns, volatility, risk metrics)\n"
+            "- Display calculated metrics in a formatted table\n"
+            "- Create visualizations of historical price movements\n"
+            "- Decompose time series into trend, seasonal, and residual components\n"
+            "- Generate future price predictions with visual forecasts\n"
+            "- Forecast volatility and risk with trend analysis\n\n"
 
             "Use ReAct style reasoning in a loop with the following format:\n"
             "THOUGHT: Describe what you need to do\n"
@@ -253,6 +626,12 @@ def reasoner(state: MessagesState):
             "OBSERVATION: Interpret the tool's output\n"
             "DECISION: Either continue to the next action OR provide the final answer to the user\n\n"
             "Always output each step on a new line with the keywords in UPPERCASE.\n"
+            "FINAL OUTPUT RULES:\n"
+            "- Keep the final answer under 8 lines.\n"
+            "- Do NOT repeat the step-by-step workflow in the final answer.\n"
+            "- NEVER mention tools, functions, reasoning steps, or decisions.\n"
+            "- Do NOT repeat any data, tables, or metrics that are already displayed above.\n"
+            "- Instead, briefly summarize what you did and suggest helpful next steps.\n"
         )
     )
 
@@ -315,6 +694,7 @@ if __name__ == "__main__":
         # Separate reasoning from final output
         reasoning_msgs = []
         final_output = None
+        metrics_table = None
 
         for i, msg in enumerate(new_messages):
             # If AI message with tool calls, it's reasoning
@@ -322,7 +702,10 @@ if __name__ == "__main__":
                 reasoning_msgs.append(msg)
             # If tool message, it's part of reasoning
             elif msg.type == "tool":
-                reasoning_msgs.append(msg)
+                if isinstance(msg.content, str) and "FINANCIAL METRICS SUMMARY" in msg.content:
+                    metrics_table = msg.content
+                else:
+                    reasoning_msgs.append(msg)
             # Last AI message without tool calls is final output
             elif msg.type == "ai" and i == len(new_messages) - 1:
                 final_output = msg
@@ -330,28 +713,35 @@ if __name__ == "__main__":
             elif msg.type == "ai":
                 reasoning_msgs.append(msg)
 
-        # Display reasoning process
+        # Display reasoning process (with ReAct format: THOUGHT/ACTION/OBSERVATION/DECISION)
         if reasoning_msgs:
             print("\n" + "=" * 80)
-            print("Thinking:")
+            print("Agent Reasoning:")
             print("=" * 80 + "\n")
             for msg in reasoning_msgs:
+                # Display AI reasoning content (includes THOUGHT and DECISION)
                 if hasattr(msg, 'content') and msg.content:
                     if msg.type == "ai":
-                        print(f"\n{msg.content}\n")
+                        print(msg.content)
+                        print()
                     elif msg.type == "tool":
-                        print(f"OBSERVATION: {msg.content}\n")
+                        # Tool results are observations
+                        print(f"OBSERVATION: {msg.content}")
+                        print()
 
+                # Display tool calls as actions
                 if hasattr(msg, 'tool_calls') and msg.tool_calls:
                     for tool_call in msg.tool_calls:
-                        print(f"ACTION: {tool_call['name']}({tool_call['args']})\n")
+                        print(f"ACTION: {tool_call['name']}({tool_call['args']})")
+                        print()
 
         # Display final output separator
         if final_output and final_output.content:
-            print("=" * 80)
             print("FINAL OUTPUT:")
-            print("=" * 80)
+            if metrics_table:
+                print(metrics_table)
+            print("=" * 80, "\n")
             print(f"\n{final_output.content}\n")
-            print("=" * 80)
+            print("=" * 80, "\n")
 
         print("\n")
