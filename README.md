@@ -1,4 +1,4 @@
-# LLM ReAct Agents
+# FinSight ReAct Agent
 
 A ReAct-style financial analysis chatbot powered by LangGraph and OpenAI that fetches stock data, calculates financial metrics, performs time series analysis, and creates comprehensive visualizations.
 
